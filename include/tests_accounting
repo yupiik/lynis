@@ -5,11 +5,10 @@
 #   Lynis
 # ------------------
 #
-# Copyright 2007-2013, Michael Boelen
-# Copyright 2007-2018, CISOfy
+# Copyright (c) Michael Boelen, CISOfy, and many contributors.
 #
-# Website  : https://cisofy.com
-# Blog     : http://linux-audit.com
+# Website  : https://cisofy.com/
+# Blog     : https://linux-audit.com/
 # GitHub   : https://github.com/CISOfy/lynis
 #
 # Lynis comes with ABSOLUTELY NO WARRANTY. This is free software, and you are
@@ -18,13 +17,16 @@
 #
 #################################################################################
 #
-    InsertSection "Accounting"
+    InsertSection "${SECTION_ACCOUNTING}"
 #
 #################################################################################
 #
     AUDITD_CONF_LOCS="${ROOTDIR}etc ${ROOTDIR}etc/audit"
     AUDITD_CONF_FILE=""
+    CMD_CONF_LOCS="${ROOTDIR}etc ${ROOTDIR}etc/cmd"
+    CMD_CONF_FILE=""
     LINUX_AUDITD_RUNNING=0
+    LINUX_CMD_RUNNING=0
     AUDIT_DAEMON_RUNNING=0
     SOLARIS_AUDITD_RUNNING=0
 #
@@ -42,7 +44,7 @@
             Display --indent 2 --text "- Checking accounting information" --result "${STATUS_NOT_FOUND}" --color YELLOW
             LogText "Result: No accounting information available"
             LogText "Remark: Possibly there is another location where the accounting data is stored"
-            ReportSuggestion ${TEST_NO} "Enable process accounting"
+            ReportSuggestion "${TEST_NO}" "Enable process accounting"
             AddHP 2 3
         fi
     fi
@@ -61,7 +63,7 @@
             Display --indent 2 --text "- Checking accounting information" --result "${STATUS_NOT_FOUND}" --color YELLOW
             LogText "Result: No accounting information available"
             LogText "Remark: Possibly there is another location where the accounting data is stored"
-            ReportSuggestion ${TEST_NO} "Enable process accounting"
+            ReportSuggestion "${TEST_NO}" "Enable process accounting"
             AddHP 2 3
         fi
     fi
@@ -88,9 +90,9 @@
             AddHP 3 3
         else
             Display --indent 2 --text "- Checking accounting information" --result "${STATUS_NOT_FOUND}" --color YELLOW
-            LogText "Result: No accounting information available (${ROOTDIR}var/account/pacct, ${ROOTDIR}var/log/account/pact nor ${ROOTDIR}var/log/pact exist)"
+            LogText "Result: No accounting information available (${ROOTDIR}var/account/pacct, ${ROOTDIR}var/log/account/pacct nor ${ROOTDIR}var/log/pacct exist)"
             LogText "Remark: Possibly there is another location where the accounting data is stored"
-            ReportSuggestion ${TEST_NO} "Enable process accounting"
+            ReportSuggestion "${TEST_NO}" "Enable process accounting"
             AddHP 2 3
         fi
     fi
@@ -105,28 +107,39 @@
         if [ -f ${ROOTDIR}etc/default/sysstat ]; then
             LogText "Result: ${ROOTDIR}etc/default/sysstat found"
             FIND=$(${GREPBINARY} "^ENABLED" ${ROOTDIR}etc/default/sysstat | ${GREPBINARY} -i true)
-            if [ ! -z "${FIND}" ]; then
+            if [ -n "${FIND}" ]; then
                 LogText "Result: sysstat enabled via ${ROOTDIR}etc/default/sysstat"
                 Display --indent 2 --text "- Checking sysstat accounting data" --result "${STATUS_ENABLED}" --color GREEN
             else
                 LogText "Result: sysstat disabled via ${ROOTDIR}etc/default/sysstat"
                 Display --indent 2 --text "- Checking sysstat accounting data" --result "${STATUS_DISABLED}" --color WHITE
-                ReportSuggestion ${TEST_NO} "Enable sysstat to collect accounting (disabled)"
+                ReportSuggestion "${TEST_NO}" "Enable sysstat to collect accounting (disabled)"
             fi
         elif [ -f ${ROOTDIR}etc/cron.d/sysstat ]; then
             FIND=$(${GREPBINARY} -v '^[[:space:]]*\(#\|$\)' ${ROOTDIR}etc/cron.d/sysstat)
-            if [ ! -z "${FIND}" ]; then
+            if [ -n "${FIND}" ]; then
                 LogText "Result: sysstat enabled via ${ROOTDIR}etc/cron.d/sysstat"
                 Display --indent 2 --text "- Checking sysstat accounting data" --result "${STATUS_ENABLED}" --color GREEN
             else
                 LogText "Result: sysstat disabled via ${ROOTDIR}etc/cron.d/sysstat"
                 Display --indent 2 --text "- Checking sysstat accounting data" --result "${STATUS_DISABLED}" --color WHITE
-                ReportSuggestion ${TEST_NO} "Enable sysstat to collect accounting (cron disabled)"
+                ReportSuggestion "${TEST_NO}" "Enable sysstat to collect accounting (cron disabled)"
+            fi
+        elif [ -f "${ROOTDIR}lib/systemd/system/sysstat.service" ] || [ -f "${ROOTDIR}etc/systemd/system/sysstat.service" ]; then
+            LogText "Result: sysstat systemd unit found"
+            if [ -L "${ROOTDIR}etc/systemd/system/multi-user.target.wants/sysstat.service" ]; then
+                # Assuming -collect.timer and -summary.timer are enabled as well,
+                # as they are usually in the install section.
+                LogText "Result: sysstat enabled via systemd"
+                Display --indent 2 --text "- Checking sysstat accounting data" --result "${STATUS_ENABLED}" --color GREEN
+            else
+                LogText "Result: sysstat disabled via systemd"
+                Display --indent 2 --text "- Checking sysstat accounting data" --result "${STATUS_DISABLED}" --color WHITE
             fi
         else
-            LogText "Result: sysstat not found via ${ROOTDIR}etc/default/sysstat or ${ROOTDIR}etc/cron.d/sysstat"
+            LogText "Result: sysstat not found via ${ROOTDIR}etc/default/sysstat or ${ROOTDIR}etc/cron.d/sysstat or as a systemd unit"
             Display --indent 2 --text "- Checking sysstat accounting data" --result "${STATUS_NOT_FOUND}" --color YELLOW
-            ReportSuggestion ${TEST_NO} "Enable sysstat to collect accounting (no results)"
+            ReportSuggestion "${TEST_NO}" "Enable sysstat to collect accounting (no results)"
         fi
     fi
 #
@@ -134,13 +147,12 @@
 #
     # Test        : ACCT-9628
     # Description : Check auditd status
-    if [ ! -z "${AUDITDBINARY}" ]; then PREQS_MET="YES"; else PREQS_MET="NO"; fi
+    if [ -n "${AUDITDBINARY}" ]; then PREQS_MET="YES"; else PREQS_MET="NO"; fi
     Register --test-no ACCT-9628 --os Linux --weight L --network NO --category security --description "Check for auditd"
     if [ ${SKIPTEST} -eq 0 ]; then
         LogText "Test: Check auditd status"
         # Should not get kauditd
-        IsRunning auditd
-        if [ ${RUNNING} -eq 1 ]; then
+        if IsRunning "auditd"; then
             LogText "Result: auditd running"
             Display --indent 2 --text "- Checking auditd" --result "${STATUS_ENABLED}" --color GREEN
             LINUX_AUDITD_RUNNING=1
@@ -152,7 +164,7 @@
             LogText "Result: auditd not active"
             Display --indent 2 --text "- Checking auditd" --result "${STATUS_NOT_FOUND}" --color WHITE
             if [ ! "${VMTYPE}" = "openvz" ]; then
-                ReportSuggestion ${TEST_NO} "Enable auditd to collect audit information"
+                ReportSuggestion "${TEST_NO}" "Enable auditd to collect audit information"
             fi
             AddHP 0 1
             Report "linux_auditd_running=0"
@@ -163,7 +175,7 @@
 #
     # Test        : ACCT-9630
     # Description : Check auditd rules
-    if [ ! -z "${AUDITDBINARY}" -a ! -z "${AUDITCTLBINARY}" -a ${LINUX_AUDITD_RUNNING} -eq 1 ]; then PREQS_MET="YES"; else PREQS_MET="NO"; fi
+    if [ -n "${AUDITDBINARY}" -a -n "${AUDITCTLBINARY}" -a ${LINUX_AUDITD_RUNNING} -eq 1 ]; then PREQS_MET="YES"; else PREQS_MET="NO"; fi
     Register --test-no ACCT-9630 --os Linux --preqs-met ${PREQS_MET} --weight L --network NO --root-only YES --category security --description "Check for auditd rules"
     if [ ${SKIPTEST} -eq 0 ]; then
         LogText "Test: Checking auditd rules"
@@ -172,7 +184,7 @@
             LogText "Result: auditd rules empty"
             Display --indent 4 --text "- Checking audit rules" --result "${STATUS_SUGGESTION}" --color YELLOW
             AddHP 0 2
-            ReportSuggestion ${TEST_NO} "Audit daemon is enabled with an empty ruleset. Disable the daemon or define rules"
+            ReportSuggestion "${TEST_NO}" "Audit daemon is enabled with an empty ruleset. Disable the daemon or define rules"
         else
             LogText "Result: found auditd rules"
             Display --indent 4 --text "- Checking audit rules" --result "${STATUS_OK}" --color GREEN
@@ -189,7 +201,7 @@
 #
     # Test        : ACCT-9632
     # Description : Check auditd configuration file
-    if [ ! -z "${AUDITDBINARY}" -a ${LINUX_AUDITD_RUNNING} -eq 1 ]; then PREQS_MET="YES"; else PREQS_MET="NO"; fi
+    if [ -n "${AUDITDBINARY}" -a ${LINUX_AUDITD_RUNNING} -eq 1 ]; then PREQS_MET="YES"; else PREQS_MET="NO"; fi
     Register --test-no ACCT-9632 --os Linux --preqs-met ${PREQS_MET} --weight L --network NO --category security --description "Check for auditd configuration file"
     if [ ${SKIPTEST} -eq 0 ]; then
         LogText "Test: Checking auditd configuration file"
@@ -202,12 +214,12 @@
             fi
         done
         # Check if we discovered the configuration file. It should be there is the binaries are available and process is running
-        if [ ! -z "${AUDITD_CONF_FILE}" ]; then
+        if [ -n "${AUDITD_CONF_FILE}" ]; then
             Display --indent 4 --text "- Checking audit configuration file" --result "${STATUS_OK}" --color GREEN
         else
             LogText "Result: could not find auditd configuration file"
             Display --indent 4 --text "- Checking audit configuration file" --result "${STATUS_FOUND}" --color RED
-            ReportSuggestion ${TEST_NO} "Determine the location of auditd configuration file"
+            ReportSuggestion "${TEST_NO}" "Determine the location of auditd configuration file"
         fi
     fi
 #
@@ -215,27 +227,29 @@
 #
     # Test        : ACCT-9634
     # Description : Check auditd log file
-    if [ ! -z "${AUDITDBINARY}" -a ${LINUX_AUDITD_RUNNING} -eq 1 -a ! -z "${AUDITD_CONF_FILE}" ]; then PREQS_MET="YES"; else PREQS_MET="NO"; fi
+    if [ -n "${AUDITDBINARY}" -a ${LINUX_AUDITD_RUNNING} -eq 1 -a -n "${AUDITD_CONF_FILE}" ]; then PREQS_MET="YES"; else PREQS_MET="NO"; fi
     Register --test-no ACCT-9634 --os Linux --preqs-met ${PREQS_MET} --weight L --network NO --category security --description "Check for auditd log file"
     if [ ${SKIPTEST} -eq 0 ]; then
         LogText "Test: Checking auditd log file"
+        DEFAULT_LOCATION="/var/log/audit/audit.log"
         FIND=$(${GREPBINARY} "^log_file" ${AUDITD_CONF_FILE} | ${AWKBINARY} '{ if ($1=="log_file" && $2=="=") { print $3 } }')
-        if [ ! -z "${FIND}" ]; then
+        if [ -n "${FIND}" ]; then
             LogText "Result: log file is defined"
             LogText "Defined value: ${FIND}"
-            if [ -f ${FIND} ]; then
-                LogText "Result: log file ${FIND} exists on disk"
-                Display --indent 4 --text "- Checking auditd log file" --result "${STATUS_FOUND}" --color GREEN
-                Report "logfile[]=${FIND}"
-            else
-                LogText "Result: can't find log file ${FIND} on disk"
-                Display --indent 4 --text "- Checking auditd log file" --result "${STATUS_SUGGESTION}" --color YELLOW
-                ReportSuggestion ${TEST_NO} "Check auditd log file location"
-            fi
         else
-            LogText "Result: no log file found"
-            Display --indent 4 --text "- Checking auditd log file" --result "${STATUS_WARNING}" --color RED
-            ReportWarning ${TEST_NO} "Auditd log file is defined but can not be found on disk"
+            LogText "Result: log file is not defined"
+            LogText "Assumed default location: ${DEFAULT_LOCATION}"
+            FIND="${DEFAULT_LOCATION}"
+        fi
+
+        if [ -f ${FIND} ]; then
+            LogText "Result: log file ${FIND} exists on disk"
+            Display --indent 4 --text "- Checking auditd log file" --result "${STATUS_FOUND}" --color GREEN
+            Report "logfile[]=${FIND}"
+        else
+            LogText "Result: can't find log file ${FIND} on disk"
+            Display --indent 4 --text "- Checking auditd log file" --result "${STATUS_SUGGESTION}" --color RED
+            ReportWarning "${TEST_NO}" "Check auditd log file location"
         fi
     fi
 #
@@ -252,14 +266,14 @@
             if [ -f ${ROOTDIR}etc/ld.so.preload ]; then
                 LogText "Result: found ${ROOTDIR}etc/ld.so.preload, testing if snoopy.so is listed"
                 FIND=$(${GREPBINARY} ${FILE} ${ROOTDIR}etc/ld.so.preload)
-                if [ ! -z "${FIND}" ]; then
+                if [ -n "${FIND}" ]; then
                     LogText "Result: found snoopy in ld.so.preload"
                     LogText "Output: ${FIND}"
                     Display --indent 6 --text "- Library in ld.so.preload" --result "LOADED" --color GREEN
                     Report "audit_trail_tool[]=snoopy"
                 else
                     Display --indent 6 --text "- Library in ld.so.preload" --result "${STATUS_NOT_FOUND}" --color YELLOW
-                    ReportSuggestion ${TEST_NO} "Snoopy is installed but not loaded via ${ROOTDIR}etc/ld.so.preload"
+                    ReportSuggestion "${TEST_NO}" "Snoopy is installed but not loaded via ${ROOTDIR}etc/ld.so.preload"
                     AddHP 3 3
                 fi
             else
@@ -277,8 +291,7 @@
     Register --test-no ACCT-9650 --os Solaris --weight L --network NO --category security --description "Check Solaris audit daemon"
     if [ ${SKIPTEST} -eq 0 ]; then
         LogText "Test: check if audit daemon is running"
-        IsRunning auditd
-        if [ ${RUNNING} -eq 1 ]; then
+        if IsRunning "auditd"; then
             LogText "Result: Solaris audit daemon is running"
             SOLARIS_AUDITD_RUNNING=1
             AUDIT_DAEMON_RUNNING=1
@@ -298,7 +311,7 @@
     if [ ${SKIPTEST} -eq 0 ]; then
         LogText "Test: check if auditd service is enabled and online"
         FIND=$(${ROOTDIR}usr/bin/svcs svc:/system/auditd:default | ${GREPBINARY} "^online")
-        if [ ! -z "${FIND}" ]; then
+        if [ -n "${FIND}" ]; then
             LogText "Result: auditd service is online"
             Display --indent 4 --text "- Checking Solaris audit daemon status" --result "${STATUS_ON}"LINE --color GREEN
         else
@@ -317,7 +330,7 @@
         LogText "Test: check if BSM is enabled in ${ROOTDIR}etc/system"
         if [ -f ${ROOTDIR}etc/system ]; then
             FIND=$(${GREPBINARY} 'set c2audit:audit_load = 1' ${ROOTDIR}etc/system)
-            if [ ! -z "${FIND}" ]; then
+            if [ -n "${FIND}" ]; then
                 LogText "Result: BSM is enabled in ${ROOTDIR}etc/system"
                 Display --indent 4 --text "- Checking Solaris BSM (${ROOTDIR}etc/system)" --result "${STATUS_ENABLED}" --color GREEN
             else
@@ -339,7 +352,7 @@
         LogText "Test: check if c2audit module is active"
         if [ -x ${ROOTDIR}usr/sbin/modinfo ]; then
             FIND=$(${ROOTDIR}usr/sbin/modinfo | ${GREPBINARY} c2audit)
-            if [ ! -z "${FIND}" ]; then
+            if [ -n "${FIND}" ]; then
                 LogText "Result: c2audit found in modinfo output"
                 Display --indent 4 --text "- Checking Solaris BSM (modules list)" --result "${STATUS_ENABLED}" --color GREEN
             else
@@ -362,7 +375,7 @@
         if [ -f ${ROOTDIR}etc/security/audit_control ]; then
             LogText "Result: file ${ROOTDIR}etc/security/audit_control found"
             FIND=$(${GREPBINARY} "^dir" ${ROOTDIR}etc/security/audit_control | ${AWKBINARY} -F: '{ print $2 }')
-            if [ ! -z "${FIND}" ]; then
+            if [ -n "${FIND}" ]; then
                 LogText "Result: found location ${FIND}"
                 LogText "Test: Checking if location is a valid directory"
                 if [ -d ${FIND} ]; then
@@ -406,6 +419,59 @@
 #
 #################################################################################
 #
+    # Test        : ACCT-9670
+    # Description : Check cmd status
+    if [ -n "${CMDBINARY}" ]; then PREQS_MET="YES"; else PREQS_MET="NO"; fi
+    Register --test-no ACCT-9670 --os Linux --preqs-met ${PREQS_MET} --weight L --network NO --category security --description "Check for cmd"
+    if [ ${SKIPTEST} -eq 0 ]; then
+        LogText "Test: Check cmd status"
+        if IsRunning "cmd_daemon"; then
+            LogText "Result: cmd running"
+            Display --indent 2 --text "- Checking cmd" --result "${STATUS_ENABLED}" --color GREEN
+            LINUX_CMD_RUNNING=1
+            AUDIT_DAEMON_RUNNING=1
+            Report "audit_trail_tool[]=cmd"
+            Report "linux_cmd_running=1"
+            AddHP 4 4
+        else
+            LogText "Result: cmd not active"
+            Display --indent 2 --text "- Checking cmd" --result "${STATUS_NOT_FOUND}" --color WHITE
+            if [ ! "${VMTYPE}" = "openvz" ]; then
+                ReportSuggestion "${TEST_NO}" "Install cmd to collect audit information"
+            fi
+            AddHP 0 1
+            Report "linux_cmd_running=0"
+        fi
+    fi
+#
+#################################################################################
+#
+    # Test        : ACCT-9672
+    # Description : Check cmd configuration file
+    if [ -n "${CMDBINARY}" -a ${LINUX_CMD_RUNNING} -eq 1 ]; then PREQS_MET="YES"; else PREQS_MET="NO"; fi
+    Register --test-no ACCT-9672 --os Linux --preqs-met ${PREQS_MET} --weight L --network NO --category security --description "Check for cmd configuration file"
+    if [ ${SKIPTEST} -eq 0 ]; then
+        LogText "Test: Checking cmd configuration file"
+        for DIR in ${CMD_CONF_LOCS}; do
+            if [ -f ${DIR}/config.ini ]; then
+                CMD_CONF_FILE="${DIR}/config.ini"
+                LogText "Result: Found ${DIR}/config.ini"
+            else
+                LogText "Result: ${DIR}/config.ini not found"
+            fi
+        done
+        # Check if we discovered the configuration file. It should be there is the binaries are available and process is running
+        if [ -n "${CMD_CONF_FILE}" ]; then
+            Display --indent 4 --text "- Checking cmd configuration file" --result "${STATUS_OK}" --color GREEN
+        else
+            LogText "Result: could not find cmd configuration file"
+            Display --indent 4 --text "- Checking cmd configuration file" --result "${STATUS_FOUND}" --color RED
+            ReportSuggestion "${TEST_NO}" "Determine the location of cmd configuration file"
+        fi
+    fi
+#
+#################################################################################
+#
     Report "audit_daemon_running=${AUDIT_DAEMON_RUNNING}"
 #
 #################################################################################
@@ -413,6 +479,4 @@
 
 WaitForKeyPress
 
-#
-#================================================================================
-# Lynis - Copyright 2007-2018, Michael Boelen / CISOfy - https://cisofy.com
+# EOF

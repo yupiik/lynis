@@ -5,11 +5,10 @@
 #   Lynis
 # ------------------
 #
-# Copyright 2007-2013, Michael Boelen
-# Copyright 2007-2018, CISOfy
+# Copyright (c) Michael Boelen, CISOfy, and many contributors.
 #
-# Website  : https://cisofy.com
-# Blog     : http://linux-audit.com
+# Website  : https://cisofy.com/
+# Blog     : https://linux-audit.com/
 # GitHub   : https://github.com/CISOfy/lynis
 #
 # Lynis comes with ABSOLUTELY NO WARRANTY. This is free software, and you are
@@ -25,16 +24,18 @@
 #
 #################################################################################
 #
-    InsertSection "Software: system integrity"
+    InsertSection "${SECTION_SYSTEM_INTEGRITY}"
     Display --indent 2 --text "- Checking file integrity tools"
 #
 #################################################################################
 #
+    # Test        : SINT-7010
+    # Description : System Integrity Status
     if [ -x ${ROOTDIR}/usr/bin/csrutil ]; then PREQS_MET="YES"; else PREQS_MET="NO"; SKIPREASON="No CSrutil binary found"; fi
-    Register --test-no SINT-7010 --preqs-met ${PREQS_MET} --skip-reason "${SKIPREASON}" --weight H --network NO --category security --description "System Integrity Status"
+    Register --test-no SINT-7010 --os MacOS --preqs-met ${PREQS_MET} --skip-reason "${SKIPREASON}" --weight H --network NO --category security --description "System Integrity Status"
     if [ ${SKIPTEST} -eq 0 ]; then
         if ${ROOTDIR}usr/bin/csrutil status | ${GREPBINARY} -sq enabled ; then
-            Display --indent 2 --text "- System Integrity Protectioni (status)" --result "${STATUS_OK}" --color GREEN
+            Display --indent 2 --text "- System Integrity Protection (status)" --result "${STATUS_OK}" --color GREEN
             Report "system_integrity_tool[]=mac-sip"
             LogText "Result: SIP enabled, OK"
             AddHP 3 3
@@ -48,7 +49,7 @@
 #
 #################################################################################
 #
-    WaitForKeyPress
-#
-#================================================================================
-# Lynis - Copyright 2007-2018 Michael Boelen, CISOfy - https://cisofy.com
+
+WaitForKeyPress
+
+# EOF

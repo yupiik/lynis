@@ -5,11 +5,10 @@
 #   Lynis
 # ------------------
 #
-# Copyright 2007-2013, Michael Boelen
-# Copyright 2007-2018, CISOfy
+# Copyright (c) Michael Boelen, CISOfy, and many contributors.
 #
 # Website  : https://cisofy.com
-# Blog     : http://linux-audit.com
+# Blog     : https://linux-audit.com/
 # GitHub   : https://github.com/CISOfy/lynis
 #
 # Lynis comes with ABSOLUTELY NO WARRANTY. This is free software, and you are
@@ -22,12 +21,12 @@
 #
 #################################################################################
 #
-    InsertSection "Banners and identification"
+    InsertSection "${SECTION_BANNERS_AND_IDENTIFICATION}"
 #
 #################################################################################
 #
     BANNER_FILES="${ROOTDIR}etc/issue ${ROOTDIR}etc/issue.net ${ROOTDIR}etc/motd"
-    LEGAL_BANNER_STRINGS="audit access authori connect enforce evidence forbidden intrusion law legal monitor owner policy policies privacy private prohibited record restricted secure subject system terms unauthorized"
+    LEGAL_BANNER_STRINGS="audit access authori condition connect consent continu criminal enforce evidence forbidden intrusion law legal legislat log monitor owner penal policy policies privacy private prohibited prosecute record report restricted secure subject system terms warning"
 #
 #################################################################################
 #
@@ -107,8 +106,8 @@
             AddHP 2 2
         else
             LogText "Result: Found only ${COUNT} key words (5 or more suggested), to warn unauthorized users and could be increased"
-            Display --indent 4 --text "- ${FILE} contents" --result WEAK --color YELLOW
-            ReportSuggestion ${TEST_NO} "Add a legal banner to ${FILE}, to warn unauthorized users"
+            Display --indent 4 --text "- ${FILE} contents" --result "${STATUS_WEAK}" --color YELLOW
+            ReportSuggestion "${TEST_NO}" "Add a legal banner to ${FILE}, to warn unauthorized users"
             AddHP 0 1
             Report "weak_banner_file[]=${FILE}"
         fi
@@ -160,8 +159,8 @@
             AddHP 2 2
         else
             LogText "Result: Found only ${COUNT} key words, to warn unauthorized users and could be increased"
-            Display --indent 4 --text "- ${ROOTDIR}etc/issue.net contents" --result WEAK --color YELLOW
-            ReportSuggestion ${TEST_NO} "Add legal banner to /etc/issue.net, to warn unauthorized users"
+            Display --indent 4 --text "- ${ROOTDIR}etc/issue.net contents" --result "${STATUS_WEAK}" --color YELLOW
+            ReportSuggestion "${TEST_NO}" "Add legal banner to /etc/issue.net, to warn unauthorized users"
             AddHP 0 1
         fi
     fi
